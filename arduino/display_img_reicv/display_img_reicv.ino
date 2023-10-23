@@ -125,7 +125,6 @@ void recvWithStartEndMarkers()
         {
           int pixelValue = (c & (1 << bit)) ? 1 : 0;
           display.drawPixel(x, y, pixelValue);
-          // showText(0, String(c), 3);
           x++;
           if (x >= SCREEN_WIDTH)
           {
