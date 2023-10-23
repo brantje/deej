@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"math/rand"
 	"os"
 
 	"github.com/fcjr/geticon"
@@ -62,7 +63,7 @@ func main() {
 		log.Fatalf("Load BMP icon: %v", err)
 	}
 
-	byteSlice = encode1Bit(img)
+	byteSlice = convertForDisplay(img, false)
 
 	sendData := append([]byte("<<START>>1|"), byteSlice...)
 	sendData = append(sendData, []byte("<<END>>.....")...)
@@ -75,7 +76,10 @@ func main() {
 	//============== Send an process icon to a display ==============
 	// Note: Not all applications work yet
 
-	process := "firefox.exe"
+	procs, err := process.Processes()
+	n := rand.Int() % len(procs)
+	randomProc := procs[n]
+	process, _ := randomProc.Name()
 	fmt.Printf("Fetching process info of %s\n", process)
 	pid, err := GetPIDByExeName(process)
 	if err != nil {
@@ -86,14 +90,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Fetch icon: %v", err)
 	}
-	imageType, err := DetectImageTypeFromImage(icon)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Printf("Detected icon image type: %s\n", imageType)
 
-	bw := convertForDisplay(icon)
+	bw := convertForDisplay(icon, true)
 
 	// sendData := []byte{}
 	sendData = append([]byte("<<START>>2|"), bw...)
@@ -117,7 +115,7 @@ func main() {
 		}
 	}
 
-	buf := make([]byte, 1024)
+	buf := make([]byte, 512)
 
 	for {
 		n, err := port.Read(buf)
@@ -125,9 +123,10 @@ func main() {
 			log.Fatal(err)
 		}
 		s := string(buf[:n])
-		fmt.Println(s)
+		if s != "" {
+			fmt.Println(s)
+		}
 	}
-
 }
 
 // DetectImageTypeFromImage detects the image type of an image.Image
@@ -146,7 +145,7 @@ func DetectImageType(data []byte) (ImageType, error) {
 	if len(data) < 4 {
 		return UNKNOWN, errors.New("data too short for image detection")
 	}
-
+	fmt.Printf("%#02x\n", data[0])
 	switch {
 	case data[0] == 0xFF && data[1] == 0xD8:
 		return JPEG, nil
@@ -154,6 +153,8 @@ func DetectImageType(data []byte) (ImageType, error) {
 		return PNG, nil
 	case data[0] == 'G' && data[1] == 'I' && data[2] == 'F':
 		return GIF, nil
+	case data[0] == 'B' && data[1] == 'M':
+		return BMP, nil
 	case data[0] == 'B' && data[1] == 'M':
 		return BMP, nil
 	default:
@@ -177,12 +178,22 @@ func GetPIDByExeName(exeName string) (uint32, error) {
 	return 0, fmt.Errorf("no process found with exe name: %s", exeName)
 }
 
-func convertForDisplay(src image.Image) []byte {
+func convertForDisplay(src image.Image, doResize bool) []byte {
+	// imageType, err := DetectImageTypeFromImage(src)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return []byte{}
+	// }
+	// fmt.Printf("Detected icon image type: %s\n", imageType)
 	// Resize to 50x50
 	fmt.Println("Converting icon to for display")
-	fmt.Println("Resize to 50x50")
-	resizedImg := resize.Resize(60, 60, src, resize.Lanczos3)
-
+	var resizedImg image.Image
+	if doResize {
+		fmt.Println("Resize to 60x60")
+		resizedImg = resize.Resize(60, 60, src, resize.Lanczos3)
+	} else {
+		resizedImg = src
+	}
 	// Create a blank canvas of size 128x64
 	fmt.Println("Create new 128x64 image")
 	canvas := image.NewRGBA(image.Rect(0, 0, 128, 64))
@@ -201,19 +212,10 @@ func convertForDisplay(src image.Image) []byte {
 
 	// Convert the canvas to black and white
 	fmt.Println("Convert to black and white")
-	bwImg := toBlackAndWhite(canvas)
+	// bwImg := toBlackAndWhite(canvas)
 
 	fmt.Println("Coverting to 1 bit image")
-	buf, _ := encode1BitBMP(bwImg)
-
-	f, err := os.Create("img.png")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	if err = png.Encode(f, bwImg); err != nil {
-		log.Printf("failed to encode: %v", err)
-	}
+	buf := encode1Bit(canvas)
 
 	return buf
 }
@@ -227,13 +229,8 @@ func encode1Bit(img image.Image) []byte {
 
 	for y := sz.Min.Y; y < sz.Max.Y; y++ {
 		for x := sz.Min.X; x < sz.Max.X; x++ {
-			r, g, b, _ := img.At(x, y).RGBA()
-
-			// Calculate the luminance. Using simplified method: (R+G+B)/3
-			lum := (r + g + b) / 3
-
-			// If the pixel is white, set the corresponding bit to 1
-			if lum > 0x8000 {
+			c := color.GrayModel.Convert(img.At(x, y)).(color.Gray)
+			if c.Y > 127 {
 				currentByte |= (1 << bitPosition)
 			}
 
@@ -253,83 +250,4 @@ func encode1Bit(img image.Image) []byte {
 	}
 
 	return buff.Bytes()
-}
-func encode1BitBMP(img *image.Gray) ([]byte, error) {
-	var buf bytes.Buffer
-
-	// Screw headers we don't need them anyway
-
-	// File header
-	// fileHeader := []byte("BM")
-	// fileSize := make([]byte, 4)
-	// dataOffset := make([]byte, 4)
-	// binary.LittleEndian.PutUint32(dataOffset, 62) // 14 (file header) + 40 (info header) + 8 (color table)
-	// buf.Write(fileHeader)
-	// buf.Write(fileSize)
-	// buf.Write([]byte{0, 0, 0, 0}) // Reserved
-	// buf.Write(dataOffset)
-
-	// Info header
-	// infoHeaderSize := make([]byte, 4)
-	// binary.LittleEndian.PutUint32(infoHeaderSize, 40)
-	// width := make([]byte, 4)
-	// height := make([]byte, 4)
-	// binary.LittleEndian.PutUint32(width, uint32(img.Bounds().Dx()))
-	// binary.LittleEndian.PutUint32(height, uint32(img.Bounds().Dy()))
-	// buf.Write(infoHeaderSize)
-	// buf.Write(width)
-	// buf.Write(height)
-	// buf.Write([]byte{1, 0})       // Planes
-	// buf.Write([]byte{1, 0})       // Bit count
-	// buf.Write(make([]byte, 4))    // Compression
-	// buf.Write(make([]byte, 4))    // Size image
-	// buf.Write(make([]byte, 4))    // X pixels per meter
-	// buf.Write(make([]byte, 4))    // Y pixels per meter
-	// buf.Write([]byte{2, 0, 0, 0}) // Colors used
-	// buf.Write([]byte{2, 0, 0, 0}) // Colors important
-
-	// // Color table
-	// buf.Write([]byte{0, 0, 0, 0})       // Black
-	// buf.Write([]byte{255, 255, 255, 0}) // White
-
-	// Pixel data
-	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
-		var byteValue byte = 0
-		var bitPos uint8 = 0
-		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			if img.GrayAt(x, y).Y > 127 {
-				byteValue |= (1 << (7 - bitPos))
-			}
-			bitPos++
-			if bitPos == 8 || x == img.Bounds().Max.X-1 {
-				buf.WriteByte(byteValue)
-				byteValue = 0
-				bitPos = 0
-			}
-		}
-	}
-
-	// Update file size in file header
-	// binary.LittleEndian.PutUint32(fileSize, uint32(buf.Len()))
-	// copy(buf.Bytes()[2:6], fileSize)
-
-	return buf.Bytes(), nil
-}
-
-func toBlackAndWhite(src image.Image) *image.Gray {
-	bounds := src.Bounds()
-	dst := image.NewGray(bounds)
-
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			c := color.GrayModel.Convert(src.At(x, y)).(color.Gray)
-			if c.Y > 127 {
-				dst.Set(x, y, color.White)
-			} else {
-				dst.Set(x, y, color.Black)
-			}
-		}
-	}
-
-	return dst
 }
