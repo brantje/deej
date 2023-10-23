@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
@@ -12,6 +11,8 @@ import (
 	"github.com/fcjr/geticon"
 	"github.com/jacobsa/go-serial/serial"
 	"github.com/nfnt/resize"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 const (
@@ -39,7 +40,11 @@ func main() {
 		InterCharacterTimeout: 100,
 	}
 
-	icon, err := geticon.FromPid(8224)
+	pid, err := GetPIDByExeName("steam.exe")
+	if err != nil {
+		log.Fatal(err)
+	}
+	icon, err := geticon.FromPid(pid)
 
 	if err != nil {
 		log.Fatalf("Fetch icon: %v", err)
@@ -95,6 +100,22 @@ func main() {
 
 }
 
+func GetPIDByExeName(exeName string) (uint32, error) {
+	procs, err := process.Processes()
+	if err != nil {
+		return 0, err
+	}
+
+	for _, p := range procs {
+		name, err := p.Name()
+		if err == nil && name == exeName {
+			return uint32(p.Pid), nil
+		}
+	}
+
+	return 0, fmt.Errorf("no process found with exe name: %s", exeName)
+}
+
 func convertForDisplay(src image.Image) []byte {
 	// Resize to 50x50
 	resizedImg := resize.Resize(50, 50, src, resize.Lanczos3)
@@ -120,41 +141,44 @@ func convertForDisplay(src image.Image) []byte {
 
 	return buf
 }
+
 func encode1BitBMP(img *image.Gray) ([]byte, error) {
 	var buf bytes.Buffer
 
+	// Screw headers we don't need them anyway
+
 	// File header
-	fileHeader := []byte("BM")
-	fileSize := make([]byte, 4)
-	dataOffset := make([]byte, 4)
-	binary.LittleEndian.PutUint32(dataOffset, 62) // 14 (file header) + 40 (info header) + 8 (color table)
-	buf.Write(fileHeader)
-	buf.Write(fileSize)
-	buf.Write([]byte{0, 0, 0, 0}) // Reserved
-	buf.Write(dataOffset)
+	// fileHeader := []byte("BM")
+	// fileSize := make([]byte, 4)
+	// dataOffset := make([]byte, 4)
+	// binary.LittleEndian.PutUint32(dataOffset, 62) // 14 (file header) + 40 (info header) + 8 (color table)
+	// buf.Write(fileHeader)
+	// buf.Write(fileSize)
+	// buf.Write([]byte{0, 0, 0, 0}) // Reserved
+	// buf.Write(dataOffset)
 
 	// Info header
-	infoHeaderSize := make([]byte, 4)
-	binary.LittleEndian.PutUint32(infoHeaderSize, 40)
-	width := make([]byte, 4)
-	height := make([]byte, 4)
-	binary.LittleEndian.PutUint32(width, uint32(img.Bounds().Dx()))
-	binary.LittleEndian.PutUint32(height, uint32(img.Bounds().Dy()))
-	buf.Write(infoHeaderSize)
-	buf.Write(width)
-	buf.Write(height)
-	buf.Write([]byte{1, 0})       // Planes
-	buf.Write([]byte{1, 0})       // Bit count
-	buf.Write(make([]byte, 4))    // Compression
-	buf.Write(make([]byte, 4))    // Size image
-	buf.Write(make([]byte, 4))    // X pixels per meter
-	buf.Write(make([]byte, 4))    // Y pixels per meter
-	buf.Write([]byte{2, 0, 0, 0}) // Colors used
-	buf.Write([]byte{2, 0, 0, 0}) // Colors important
+	// infoHeaderSize := make([]byte, 4)
+	// binary.LittleEndian.PutUint32(infoHeaderSize, 40)
+	// width := make([]byte, 4)
+	// height := make([]byte, 4)
+	// binary.LittleEndian.PutUint32(width, uint32(img.Bounds().Dx()))
+	// binary.LittleEndian.PutUint32(height, uint32(img.Bounds().Dy()))
+	// buf.Write(infoHeaderSize)
+	// buf.Write(width)
+	// buf.Write(height)
+	// buf.Write([]byte{1, 0})       // Planes
+	// buf.Write([]byte{1, 0})       // Bit count
+	// buf.Write(make([]byte, 4))    // Compression
+	// buf.Write(make([]byte, 4))    // Size image
+	// buf.Write(make([]byte, 4))    // X pixels per meter
+	// buf.Write(make([]byte, 4))    // Y pixels per meter
+	// buf.Write([]byte{2, 0, 0, 0}) // Colors used
+	// buf.Write([]byte{2, 0, 0, 0}) // Colors important
 
-	// Color table
-	buf.Write([]byte{0, 0, 0, 0})       // Black
-	buf.Write([]byte{255, 255, 255, 0}) // White
+	// // Color table
+	// buf.Write([]byte{0, 0, 0, 0})       // Black
+	// buf.Write([]byte{255, 255, 255, 0}) // White
 
 	// Pixel data
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
@@ -174,8 +198,8 @@ func encode1BitBMP(img *image.Gray) ([]byte, error) {
 	}
 
 	// Update file size in file header
-	binary.LittleEndian.PutUint32(fileSize, uint32(buf.Len()))
-	copy(buf.Bytes()[2:6], fileSize)
+	// binary.LittleEndian.PutUint32(fileSize, uint32(buf.Len()))
+	// copy(buf.Bytes()[2:6], fileSize)
 
 	return buf.Bytes(), nil
 }
