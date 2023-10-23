@@ -12,9 +12,14 @@ deej consists of a [lightweight desktop client](#features) written in Go, and an
 
 **[Download the latest release](https://github.com/omriharel/deej/releases/latest) | [Video demonstration](https://youtu.be/VoByJ4USMr8) | [Build video by Tech Always](https://youtu.be/x2yXbFiiAeI)**
 
-![deej](assets/build-3d-annotated.png)
+![deej](assets/build-oled.jpg)
 
-> _**Psst!** [No 3D printer? No problem!](./assets/build-shoebox.jpg)_ You can build deej on some cardboard, a shoebox or even a breadboard :)
+## BOM
+
+- 1x Arduino Pro Micro
+- 1x TCA9548A I2C Multiplexer
+- 5x Sliding Potentiometer with Board (10kΩ) [example](assets/slider.jpg)
+- 5x 0.96 inch OLED Display 128\*64 pixels (27mm x 27mm) (Cheap ones on eg AliExpress)
 
 ## Table of contents
 
@@ -112,8 +117,8 @@ noise_reduction: default
 - `system` is a special option on Windows to control the "System sounds" volume in the Windows mixer
 - All names are case-**in**sensitive, meaning both `chrome.exe` and `CHROME.exe` will work
 - You can create groups of process names (using a list) to either:
-    - control more than one app with a single slider
-    - choose whichever process in the group that's currently running (i.e. to have one slider control any game you're playing)
+  - control more than one app with a single slider
+  - choose whichever process in the group that's currently running (i.e. to have one slider control any game you're playing)
 
 ## Build your own!
 
@@ -135,6 +140,11 @@ In case you prefer watching to reading, Charles from the [**Tech Always**](https
 
 ### Bill of Materials
 
+- 1x Arduino Pro Micro
+- 1x TCA9548A I2C Multiplexer
+- 5x Sliding Potentiometer with Board (10kΩ) [example](assets/slider.jpg)
+- 5x 0.96 inch OLED Display 128\*64 pixels (27mm x 27mm) (Cheap ones on eg AliExpress)
+
 - An Arduino Nano, Pro Micro or Uno board
   - I officially recommend using a Nano or a Pro Micro for their smaller form-factor, friendlier USB connectors and more analog pins. Plus they're cheaper
   - You can also use any other development board that has a Serial over USB interface
@@ -142,7 +152,8 @@ In case you prefer watching to reading, Charles from the [**Tech Always**](https
   - **Important:** make sure to get **linear** sliders, not logarithmic ones! Check the product description
   - You can also use circular knobs if you like
 - Some wires
-- Any kind of box to hold everything together. **You don't need a 3D printer for this project!** It works fantastically with just a piece of cardboard or a shoebox. That being said, if you do have one, read on...
+
+That being said, if you do have one, read on...
 
 ### Thingiverse collection
 
@@ -151,7 +162,6 @@ With many different 3D-printed designs being added to our [community showcase](.
 **[Visit our community-created design collection on Thingiverse!](https://thingiverse.com/omriharel/collections/deej)**
 
 > You can also [submit your own](https://discord.gg/nf88NJu) design to be added to the collection. Regardless, if you do upload your design to Thingiverse, _please add a `deej` tag to it so that others can find it more easily_.
-
 
 ### Build procedure
 
