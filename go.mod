@@ -9,6 +9,7 @@ require (
 	github.com/getlantern/ops v0.0.0-20200403153110-8476b16edcd6 // indirect
 	github.com/getlantern/systray v0.0.0-20200324212034-d3ab4fd25d99
 	github.com/go-ole/go-ole v1.2.6
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/gopherjs/gopherjs v0.0.0-20200217142428-fce0ec30dd00 // indirect
 	github.com/jacobsa/go-serial v0.0.0-20180131005756-15cf729a72d4
 	github.com/jfreymuth/pulse v0.0.0-20200608153616-84b2d752b9d4
@@ -21,5 +22,6 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/thoas/go-funk v0.7.0
 	go.uber.org/zap v1.15.0
+	golang.org/x/image v0.0.0-20200801110659-972c09e46d76
 	golang.org/x/sys v0.12.0
 )

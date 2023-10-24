@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"log"
 	"os"
@@ -16,9 +17,11 @@ import (
 	"unsafe"
 
 	"github.com/fcjr/geticon"
+	"github.com/golang/freetype"
 	"github.com/nfnt/resize"
 	"github.com/shirou/gopsutil/v3/process"
 	"go.uber.org/zap"
+	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/sys/windows"
 )
 
@@ -127,15 +130,18 @@ func createDisplayMapFromConfig(userMapping map[string][]string, userSliderMap *
 func (deejDisplay *DeejDisplay) initDisplays() {
 	deejDisplay.renderDisplays()
 
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
 	// Create a channel to receive OS signals
 	signalChan := make(chan os.Signal, 1)
 
 	// Notify signalChan when SIGINT or SIGTERM is received
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
+	configReloadedChannel := deejDisplay.deej.config.SubscribeToChanges()
+
 	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+
 		for {
 			select {
 			case <-ticker.C:
@@ -148,6 +154,8 @@ func (deejDisplay *DeejDisplay) initDisplays() {
 						}
 					}
 				}
+			case <-configReloadedChannel:
+				deejDisplay.renderDisplays()
 
 			case <-signalChan:
 				// Exit the goroutine when receiving a termination signal
@@ -155,8 +163,7 @@ func (deejDisplay *DeejDisplay) initDisplays() {
 			}
 		}
 	}()
-	// Wait for a termination signal
-	<-signalChan
+
 }
 
 func (deejDisplay *DeejDisplay) renderDisplays() {
@@ -179,7 +186,7 @@ func (deejDisplay *DeejDisplay) sendPNGToDisplay(imagePath string, display_idx i
 		log.Fatalf("Error loading PNG icon: %v", err)
 	}
 
-	byteSlice = deejDisplay.convertForDisplay(img, false)
+	byteSlice = deejDisplay.convertForDisplay(img, false, false)
 	deejDisplay.sendData(display_idx, byteSlice)
 }
 
@@ -201,7 +208,7 @@ func (deejDisplay *DeejDisplay) sendProcessIconToDisplayByPid(pid uint32, displa
 		deejDisplay.logger.Debug("Error fetching icon: ", err)
 		return
 	}
-	byteData := deejDisplay.convertForDisplay(icon, true)
+	byteData := deejDisplay.convertForDisplay(icon, true, true)
 	deejDisplay.sendData(display_idx, byteData)
 }
 
@@ -288,7 +295,7 @@ func (deejDisplay *DeejDisplay) getPIDByExeName(exeName string) (uint32, error) 
 	return 0, fmt.Errorf("no process found with exe name: %s", exeName)
 }
 
-func (deejDisplay *DeejDisplay) convertForDisplay(src image.Image, doResize bool) []byte {
+func (deejDisplay *DeejDisplay) convertForDisplay(src image.Image, doResize bool, dithering bool) []byte {
 	// imageType, err := DetectImageTypeFromImage(src)
 	// if err != nil {
 	// 	fmt.Println(err)
@@ -320,14 +327,58 @@ func (deejDisplay *DeejDisplay) convertForDisplay(src image.Image, doResize bool
 		}
 	}
 
-	// Convert the canvas to black and white
-	deejDisplay.logger.Debug("Convert to black and white")
-	bwImg := deejDisplay.floydSteinbergDithering(canvas)
+	// canvas = deejDisplay.drawNumberOnImage(canvas, 10)
 
+	// Convert the canvas to black and white
+	if dithering {
+		deejDisplay.logger.Debug("Convert to black and white")
+		canvas = deejDisplay.floydSteinbergDithering(canvas)
+	}
 	deejDisplay.logger.Debug("Coverting to 1 bit image")
-	buf := deejDisplay.encode1Bit(bwImg)
+	buf := deejDisplay.encode1Bit(canvas)
 
 	return buf
+}
+
+func (deejDisplay *DeejDisplay) drawNumberOnImage(img image.Image, number int) *image.RGBA {
+	deejDisplay.logger.Debug("Drawing number on image")
+
+	// Convert the number to string
+	text := fmt.Sprintf("%d", number)
+
+	// Create a new image based on the original for drawing
+	dst := image.NewRGBA(img.Bounds())
+
+	// Copy the original image onto dst
+	draw.Draw(dst, dst.Bounds(), img, image.Point{}, draw.Over)
+
+	// Initialize the freetype context
+	c := freetype.NewContext()
+
+	// Set the font
+	f, err := freetype.ParseFont(goregular.TTF)
+	if err != nil {
+		log.Fatalf("Could not parse font: %v", err)
+	}
+	c.SetFont(f)
+
+	fontSize := float64(16)
+	// Set various properties
+	c.SetFontSize(fontSize) // Adjust as necessary
+	c.SetClip(dst.Bounds())
+	c.SetDst(dst)
+	c.SetSrc(image.NewUniform(color.RGBA{R: 255, G: 255, B: 255, A: 255})) // Red color
+
+	// Calculate the width of the text to align it to the top right corner
+	// pt := freetype.Pt(img.Bounds().Max.X-int(c.PointToFixed(24)>>6)*len(text), int(c.PointToFixed(24)>>6)-10)
+	pt := freetype.Pt(img.Bounds().Max.X-int(c.PointToFixed(fontSize)>>6)*len(text)+10, int(c.PointToFixed(fontSize)>>6))
+	// Draw the text
+	_, err = c.DrawString(text, pt)
+	if err != nil {
+		log.Fatalf("Could not draw text: %v", err)
+	}
+
+	return dst
 }
 
 func (deejDisplay *DeejDisplay) ditherPixel(x, y int, img *image.RGBA, errMatrix [][]float32) color.RGBA {
