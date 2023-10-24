@@ -20,12 +20,12 @@ const (
 
 // Deej is the main entity managing access to all sub-components
 type Deej struct {
-	logger   *zap.SugaredLogger
-	notifier Notifier
-	config   *CanonicalConfig
-	serial   *SerialIO
-	sessions *sessionMap
-
+	logger      *zap.SugaredLogger
+	notifier    Notifier
+	config      *CanonicalConfig
+	serial      *SerialIO
+	sessions    *sessionMap
+	display     *DeejDisplay
 	stopChannel chan bool
 	version     string
 	verbose     bool
@@ -76,6 +76,14 @@ func NewDeej(logger *zap.SugaredLogger, verbose bool) (*Deej, error) {
 	}
 
 	d.sessions = sessions
+
+	display, err := NewDeejDisplay(d, logger)
+	if err != nil {
+		logger.Errorw("Failed to create display", "error", err)
+		return nil, fmt.Errorf("create new display: %w", err)
+	}
+
+	d.display = display
 
 	logger.Debug("Created deej instance")
 

@@ -96,7 +96,7 @@ void recvWithStartEndMarkers()
 
       if (bufferIndex >= 9 && strncmp(buffer + bufferIndex - strlen(START_SERIAL_TAG), START_SERIAL_TAG, strlen(START_SERIAL_TAG)) == 0)
       {
-        showText(0, "Receiving", 2);
+        // showText(0, "Receiving", 2);
         int display_idx = Serial.readStringUntil('|').toInt();
         currentState = RECEIVING_DATA;
         memset(buffer, 0, BUFFER_SIZE); // Clear buffer
@@ -114,8 +114,8 @@ void recvWithStartEndMarkers()
         isReceiving = false;
         memset(buffer, 0, BUFFER_SIZE); // Clear buffer
         bufferIndex = 0;
-        showText(0, "Ok", 2);
-        Serial.println("Image drawn on display");
+        // showText(0, "Ok", 2);
+        // Serial.println("Image drawn on display");
         x = 0;
         y = 0;
       }

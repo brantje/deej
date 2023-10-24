@@ -21,4 +21,5 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/thoas/go-funk v0.7.0
 	go.uber.org/zap v1.15.0
+	golang.org/x/sys v0.12.0
 )

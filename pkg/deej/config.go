@@ -48,14 +48,17 @@ const (
 
 	configType = "yaml"
 
-	configKeySliderMapping       = "slider_mapping"
-	configKeyInvertSliders       = "invert_sliders"
-	configKeyCOMPort             = "com_port"
-	configKeyBaudRate            = "baud_rate"
-	configKeyNoiseReductionLevel = "noise_reduction"
-	configKeyDisplayConfig       = "display_config"
-	defaultCOMPort               = "COM4"
-	defaultBaudRate              = 9600
+	configKeySliderMapping                = "slider_mapping"
+	configKeyInvertSliders                = "invert_sliders"
+	configKeyCOMPort                      = "com_port"
+	configKeyBaudRate                     = "baud_rate"
+	configKeyNoiseReductionLevel          = "noise_reduction"
+	configKeyDisplayConfig                = "display_config"
+	configKeyDisplayConfigEnabled         = "display_config.enabled"
+	configKeyDisplayConfigDitherThreshold = "display_config.dither_threshold"
+	configKeyDisplayConfigDisplayMapping  = "display_config.display_mapping"
+	defaultCOMPort                        = "COM4"
+	defaultBaudRate                       = 9600
 )
 
 // has to be defined as a non-constant because we're using path.Join
@@ -246,12 +249,14 @@ func (cc *CanonicalConfig) populateFromVipers() error {
 	cc.NoiseReductionLevel = cc.userConfig.GetString(configKeyNoiseReductionLevel)
 
 	// Populate DisplayConfig from the config
-	cc.logger.Debug(cc.userConfig.AllKeys())
 	displayConfig := newDisplayConfig()
-	if err := cc.userConfig.UnmarshalKey(configKeyDisplayConfig, displayConfig); err != nil {
-		cc.logger.Warnw("Failed to unmarshal display config", "error", err)
-		return err
-	}
+	displayConfig.Enabled = cc.userConfig.GetBool(configKeyDisplayConfigEnabled)
+	displayConfig.DitherThreshold = cc.userConfig.GetInt(configKeyDisplayConfigDitherThreshold)
+	displayConfig.DisplayMapping = createDisplayMapFromConfig(cc.userConfig.GetStringMapStringSlice(configKeyDisplayConfigDisplayMapping), cc.SliderMapping)
+	// if err := cc.userConfig.UnmarshalKey(configKeyDisplayConfig, displayConfig); err != nil {
+	// 	cc.logger.Warnw("Failed to unmarshal display config", "error", err)
+	// 	return err
+	// }
 	cc.DisplayConfig = displayConfig
 
 	cc.logger.Debug("Populated config fields from vipers")

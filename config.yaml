@@ -8,9 +8,7 @@
 # important: slider indexes start at 0, regardless of which analog pins you're using!
 slider_mapping:
   0: master
-  1:
-    - chrome.exe
-    - firefox.exe
+  1: deej.current
   2: discord.exe
   3:
     - pathofexile_x64.exe
@@ -30,11 +28,19 @@ noise_reduction: default
 
 # Oled display configuration
 display_config:
-  use_displays: true
+  enabled: true
   dither_threshold: 100
+  # Use auto for auto setting display icon
+  # Set a image (must be PNG) to set the image
+  # Eg
+  #   0: img/master.png -> Sets image on display 0
+  #   1: auto + deej.current shows current application icon
+  #   1: auto -> maps to firefox.exe
+  #   2: auto -> maps to discord.exe
+  #   3: spotify.exe -> Maps spotify icon
   display_mapping:
     0: icons/master.png
     1: auto
-    2: auto
+    2: icons/discord.png
     3: auto
     4: spotify.exe

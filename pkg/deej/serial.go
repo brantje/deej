@@ -109,6 +109,11 @@ func (sio *SerialIO) Start() error {
 	namedLogger.Infow("Connected", "conn", sio.conn)
 	sio.connected = true
 
+	// init displays
+	if sio.deej.config.DisplayConfig.Enabled {
+		sio.deej.display.initDisplays()
+	}
+
 	// read lines or await a stop
 	go func() {
 		connReader := bufio.NewReader(sio.conn)
