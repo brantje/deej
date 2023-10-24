@@ -154,7 +154,6 @@ func (cc *CanonicalConfig) Load() error {
 		"connectionInfo", cc.ConnectionInfo,
 		"invertSliders", cc.InvertSliders,
 		"displayConfig", cc.DisplayConfig)
-	panic(0)
 	return nil
 }
 
