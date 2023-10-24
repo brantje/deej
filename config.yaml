@@ -27,3 +27,14 @@ baud_rate: 9600
 # adjust the amount of signal noise reduction depending on your hardware quality
 # supported values are "low" (excellent hardware), "default" (regular hardware) or "high" (bad, noisy hardware)
 noise_reduction: default
+
+# Oled display configuration
+display_config:
+  use_displays: true
+  dither_threshold: 100
+  display_mapping:
+    0: icons/master.png
+    1: auto
+    2: auto
+    3: auto
+    4: spotify.exe

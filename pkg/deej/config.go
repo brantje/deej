@@ -26,10 +26,10 @@ type CanonicalConfig struct {
 	InvertSliders bool
 
 	NoiseReductionLevel string
-
-	logger             *zap.SugaredLogger
-	notifier           Notifier
-	stopWatcherChannel chan bool
+	DisplayConfig       *DisplayConfig
+	logger              *zap.SugaredLogger
+	notifier            Notifier
+	stopWatcherChannel  chan bool
 
 	reloadConsumers []chan bool
 
@@ -53,9 +53,9 @@ const (
 	configKeyCOMPort             = "com_port"
 	configKeyBaudRate            = "baud_rate"
 	configKeyNoiseReductionLevel = "noise_reduction"
-
-	defaultCOMPort  = "COM4"
-	defaultBaudRate = 9600
+	configKeyDisplayConfig       = "display_config"
+	defaultCOMPort               = "COM4"
+	defaultBaudRate              = 9600
 )
 
 // has to be defined as a non-constant because we're using path.Join
@@ -67,6 +67,11 @@ var defaultSliderMapping = func() *sliderMap {
 
 	return emptyMap
 }()
+
+var defaultDisplayConfig = func() *DisplayConfig {
+	emptyConfig := newDisplayConfig()
+	return emptyConfig
+}
 
 // NewConfig creates a config instance for the deej object and sets up viper instances for deej's config files
 func NewConfig(logger *zap.SugaredLogger, notifier Notifier) (*CanonicalConfig, error) {
@@ -89,6 +94,7 @@ func NewConfig(logger *zap.SugaredLogger, notifier Notifier) (*CanonicalConfig, 
 	userConfig.SetDefault(configKeyInvertSliders, false)
 	userConfig.SetDefault(configKeyCOMPort, defaultCOMPort)
 	userConfig.SetDefault(configKeyBaudRate, defaultBaudRate)
+	userConfig.SetDefault(configKeyDisplayConfig, defaultDisplayConfig)
 
 	internalConfig := viper.New()
 	internalConfig.SetConfigName(internalConfigName)
@@ -146,8 +152,9 @@ func (cc *CanonicalConfig) Load() error {
 	cc.logger.Infow("Config values",
 		"sliderMapping", cc.SliderMapping,
 		"connectionInfo", cc.ConnectionInfo,
-		"invertSliders", cc.InvertSliders)
-
+		"invertSliders", cc.InvertSliders,
+		"displayConfig", cc.DisplayConfig)
+	panic(0)
 	return nil
 }
 
@@ -238,6 +245,15 @@ func (cc *CanonicalConfig) populateFromVipers() error {
 
 	cc.InvertSliders = cc.userConfig.GetBool(configKeyInvertSliders)
 	cc.NoiseReductionLevel = cc.userConfig.GetString(configKeyNoiseReductionLevel)
+
+	// Populate DisplayConfig from the config
+	cc.logger.Debug(cc.userConfig.AllKeys())
+	displayConfig := newDisplayConfig()
+	if err := cc.userConfig.UnmarshalKey(configKeyDisplayConfig, displayConfig); err != nil {
+		cc.logger.Warnw("Failed to unmarshal display config", "error", err)
+		return err
+	}
+	cc.DisplayConfig = displayConfig
 
 	cc.logger.Debug("Populated config fields from vipers")
 
