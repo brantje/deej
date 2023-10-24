@@ -27,7 +27,7 @@ noise_reduction: default
 # Oled display configuration
 display_config:
   enabled: true
-  dither_threshold: 110
+  dither_threshold: 118
   # Use auto for auto setting display icon
   # Set a image (must be PNG) to set the image
   # Eg
@@ -40,5 +40,5 @@ display_config:
     0: icons/master.png
     1: auto
     2: icons/discord.png
-    3: auto
+    3: icons/firefox.png
     4: spotify.exe

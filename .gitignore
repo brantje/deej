@@ -12,4 +12,4 @@ releases/
 *.bin
 logs/
 preferences.yaml
-config.yml
+config.yaml
