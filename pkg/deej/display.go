@@ -340,8 +340,9 @@ func (deejDisplay *DeejDisplay) drawNumberOnImage(img image.Image, number int) *
 }
 
 func otsuThreshold(img *image.RGBA) uint8 {
+
 	// Step 1: Compute histogram and total pixel count
-	var histogram [256]int
+	var histogram [512]int
 	totalPixels := img.Bounds().Dx() * img.Bounds().Dy()
 
 	for y := 0; y < img.Bounds().Dy(); y++ {
