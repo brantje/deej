@@ -14,11 +14,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"unsafe"
 
 	"github.com/fcjr/geticon"
 	"github.com/golang/freetype"
 	"github.com/nfnt/resize"
+	"github.com/omriharel/deej/pkg/deej/util"
 	"github.com/shirou/gopsutil/v3/process"
 	"go.uber.org/zap"
 	"golang.org/x/image/font/gofont/goregular"
@@ -113,7 +113,7 @@ func createDisplayMapFromConfig(userMapping map[string][]string, userSliderMap *
 			mappedTo, _ := userSliderMap.get(idx)
 			firstExe := mappedTo[len(mappedTo)-1]
 
-			isCurrent := firstExe == "deej.current"
+			isCurrent := firstExe == "deej.current" || firstExe == "deej.unmapped"
 
 			mapping = append(mapping, DisplayMap{
 				display_idx: idx,
@@ -145,7 +145,8 @@ func (deejDisplay *DeejDisplay) initDisplays() {
 		for {
 			select {
 			case <-ticker.C:
-				activeWindow := getActiveWindow()
+				activeWindows, _ := util.GetCurrentWindowProcessNames()
+				activeWindow := activeWindows[len(activeWindows)-1]
 				if activeWindow != lastActiceProcess {
 					lastActiceProcess = activeWindow
 					for _, displayConfig := range deejDisplay.deej.config.DisplayConfig.DisplayMapping {
@@ -237,49 +238,6 @@ func (deejDisplay *DeejDisplay) checkError(msg string, err error) {
 	}
 }
 
-func getActiveWindow() string {
-	// Fetch all processes using gopsutil
-
-	if hwnd := getWindow("GetForegroundWindow"); hwnd != 0 {
-		pid := GetWindowPID(HWND(hwnd))
-		name := GetProcessName(pid)
-		return strings.ToLower(name)
-	}
-
-	return ""
-}
-
-func GetWindowPID(hwnd HWND) uint32 {
-	var pid uint32
-	procGetWindowThreadProcessId.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&pid)))
-	return pid
-}
-
-func GetProcessName(pid uint32) string {
-	const PROCESS_QUERY_INFORMATION = 0x0400
-	const PROCESS_VM_READ = 0x0010
-
-	handle, _, _ := procOpenProcess.Call(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ, 0, uintptr(pid))
-	if handle == 0 {
-		return ""
-	}
-	defer windows.CloseHandle(windows.Handle(handle))
-
-	var buf [512]uint16
-	ret, _, _ := procGetModuleBaseName.Call(handle, 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
-	if ret == 0 {
-		return ""
-	}
-
-	return windows.UTF16ToString(buf[:ret])
-}
-
-func getWindow(funcName string) uintptr {
-	proc := mod.NewProc(funcName)
-	hwnd, _, _ := proc.Call()
-	return hwnd
-}
-
 func (deejDisplay *DeejDisplay) getPIDByExeName(exeName string) (uint32, error) {
 	procs, err := process.Processes()
 	if err != nil {
@@ -288,7 +246,7 @@ func (deejDisplay *DeejDisplay) getPIDByExeName(exeName string) (uint32, error) 
 	deejDisplay.logger.Debug("Got process list")
 	for _, p := range procs {
 		name, err := p.Name()
-		if err == nil && strings.ToLower(name) == exeName {
+		if err == nil && strings.ToLower(name) == strings.ToLower(exeName) {
 			return uint32(p.Pid), nil
 		}
 	}
@@ -381,12 +339,56 @@ func (deejDisplay *DeejDisplay) drawNumberOnImage(img image.Image, number int) *
 	return dst
 }
 
-func (deejDisplay *DeejDisplay) ditherPixel(x, y int, img *image.RGBA, errMatrix [][]float32) color.RGBA {
+func otsuThreshold(img *image.RGBA) uint8 {
+	// Step 1: Compute histogram and total pixel count
+	var histogram [256]int
+	totalPixels := img.Bounds().Dx() * img.Bounds().Dy()
+
+	for y := 0; y < img.Bounds().Dy(); y++ {
+		for x := 0; x < img.Bounds().Dx(); x++ {
+			grayValue := color.GrayModel.Convert(img.At(x, y)).(color.Gray).Y
+			histogram[grayValue]++
+		}
+	}
+
+	// Calculate cumulative sum and cumulative sum of pixel values
+	sum, sumB, wB, wF, threshold := 0, 0, 0, 0, 0
+	var mB, mF, between, maxBetween float64
+	for i := 0; i < 256; i++ {
+		sum += i * histogram[i]
+	}
+
+	// Step 2 & 3: Compute Otsu's threshold using the computed values
+	for t := 0; t < 256; t++ {
+		wB += histogram[t]
+		if wB == 0 {
+			continue
+		}
+		wF = totalPixels - wB
+		if wF == 0 {
+			break
+		}
+
+		sumB += t * histogram[t]
+		mB = float64(sumB) / float64(wB)
+		mF = (float64(sum) - float64(sumB)) / float64(wF)
+
+		between = float64(wB) * float64(wF) * (mB - mF) * (mB - mF)
+		if between > maxBetween {
+			maxBetween = between
+			threshold = t
+		}
+	}
+
+	return uint8(threshold)
+}
+
+func (deejDisplay *DeejDisplay) ditherPixel(x, y int, img *image.RGBA, errMatrix [][]float32, threshold uint8) color.RGBA {
 	oldPixelColor := color.GrayModel.Convert(img.At(x, y))
 	oldPixel := oldPixelColor.(color.Gray).Y
 
 	newPixel := color.RGBA{}
-	if oldPixel > uint8(deejDisplay.deej.config.DisplayConfig.DitherThreshold) { // Default 127
+	if oldPixel > threshold { // Default 127
 		newPixel = color.RGBA{255, 255, 255, 255}
 	} else {
 		newPixel = color.RGBA{0, 0, 0, 255}
@@ -412,13 +414,15 @@ func (deejDisplay *DeejDisplay) ditherPixel(x, y int, img *image.RGBA, errMatrix
 func (deejDisplay *DeejDisplay) floydSteinbergDithering(src *image.RGBA) *image.RGBA {
 	bounds := src.Bounds()
 	dest := image.NewRGBA(bounds)
+	threshold := otsuThreshold(src)
+	threshold = threshold + 25
 	errMatrix := [][]float32{
 		{0, 7.0 / 16.0},
 		{3.0 / 16.0, 5.0 / 16.0, 1.0 / 16.0},
 	}
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			dest.Set(x, y, deejDisplay.ditherPixel(x, y, src, errMatrix))
+			dest.Set(x, y, deejDisplay.ditherPixel(x, y, src, errMatrix, threshold))
 		}
 	}
 	return dest

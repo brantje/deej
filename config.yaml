@@ -8,7 +8,7 @@
 # important: slider indexes start at 0, regardless of which analog pins you're using!
 slider_mapping:
   0: master
-  1: deej.current
+  1: deej.unmapped
   2: discord.exe
   3: firefox.exe
   4: spotify.exe
@@ -22,7 +22,7 @@ baud_rate: 9600
 
 # adjust the amount of signal noise reduction depending on your hardware quality
 # supported values are "low" (excellent hardware), "default" (regular hardware) or "high" (bad, noisy hardware)
-noise_reduction: default
+noise_reduction: low
 
 # Oled display configuration
 display_config:
@@ -33,6 +33,7 @@ display_config:
   # Eg
   #   0: img/master.png -> Sets image on display 0
   #   1: auto + deej.current shows current application icon
+  #   1: auto + deej.unmapped shows current application icon
   #   1: auto -> maps to firefox.exe
   #   2: auto -> maps to discord.exe
   #   3: spotify.exe -> Maps spotify icon
